@@ -4,13 +4,11 @@
 
 **Idea:** Global Warming and Farming Practices
 
-This project would aim to investigate global climate trends and the relationship to farming practices. This project will aim to answer the following question areas:
+This project would aim to investigate global climate trends and their relationship to farming practices. This project will aim to answer the following question areas:
 1.  Are global climate metrics (e.g., land surface temperature) significantly changing over time? If so, in which direction are the changes occuring?
 2.  Can changes in global and local climate metrics be predicted by the developments and changes in farming practices (such as the increasing number of livestock farmed each year)?
 
-**Data:** I propose to scrape data from this project from a variety of sources, such as data.gov, data.gov.uk, Kaggle, [NOAA](https://www.ncdc.noaa.gov/cdo-web/), [Wunderground](https://www.wunderground.com/weather/api), etc. Due to the nature of collecting data across a variety of sources, I expect there to be repeat and missing values (across different datasets), which should form a strong basis from which to practice 'tidying' data in R.
-
-**Implactions:** The output of this project could be presented to public sector bodies such as the govermental organisations to help them inform policy and (potentially) reduce their envrionmental impact. The information could also be used in the priavate sector to help food companies create marketing campaigns in support of their food choices / farming practices (should the evidence support their methods / products).
+**Data:** I propose to source data for this project from a variety of sources including [data.gov](https://catalog.data.gov/dataset?groups=agriculture8571#topic=food_navigation), [data.gov.uk](https://data.gov.uk/dataset/farm_practices), [Kaggle](https://www.kaggle.com/dorbicycle/world-foodfeed-production), [NOAA](https://www.ncdc.noaa.gov/cdo-web/), [Wunderground](https://www.wunderground.com/weather/api), etc. Due to the nature of collecting data across a variety of sources, I expect there to be repeat and missing values (across different datasets), which should form a strong basis from which to practice 'tidying' data in R.
 
 ## Idea 2
 
@@ -26,6 +24,6 @@ This project would aim to investigate the effectiveness of mindfulness intervent
 
 This project would aim to try and predict football performance based on a range of different in-game metrics.
 
-**Data:** I will use data from the [Football Events dataset](https://www.kaggle.com/secareanualin/football-events) available on Kaggle. The dataset is the result of webscraping different text data sources.
+**Data:** I will use data from the [Football Events dataset](https://www.kaggle.com/secareanualin/football-events) available on Kaggle.
 
 
