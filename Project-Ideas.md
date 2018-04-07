@@ -4,7 +4,7 @@
 
 **Idea:** Global Warming and Farming Practices
 
-This project would aim to investigate global climate trends and their relationship to farming practices. This project will aim to answer the following question areas:
+This project would aim to investigate global climate trends and their relationship to farming practices. This project will aim to answer the following questions:
 1.  Are global climate metrics (e.g., land surface temperature) significantly changing over time? If so, in which direction are the changes occuring?
 2.  Can changes in global and local climate metrics be predicted by the developments and changes in farming practices (such as the increasing number of livestock farmed each year)?
 
