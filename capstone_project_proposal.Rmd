@@ -1,0 +1,45 @@
+---
+title: "Perceptions of Perfectionism in the Public Domain: a Sentiment Analsyis"
+output: "html_document"
+---
+***
+##### **What is the problem you want to solve?**
+Recent meta-analytical evidence has demonstrated that levels of perfectionism in Western populations has linearly increased over the past three decades, largely in part due to an increase in neoliberal governance in the US, Canada, and the UK that emphasizes competitive individualism. Over this time period, evidence has also broadly indicated perfectionism to be a personality trait fraught with negative outcomes, processes, and characteristics (although some researchers maintain there also exists some positive outcomes, processes, and characteristics).
+
+Despite a growing body of perfectionism literature, little is known about public perceptions of perfectionism in terms how people are talking and feel about perfectionism (i.e., whether it is a positive or negative construct). This remains an issue as in order for academics to *effectively* disseminate their research to a broader audience, including the public domain (e.g., through news and media outlets), the framework through which perfectionism is perceived must be *better* understood.
+
+***
+
+##### **Who is your client and why do they care about this problem? In other words, what will your client DO or DECIDE based on your analysis that they wouldn’t have otherwise?**
+The primary client for this project is the MPaW (Motivation, Performance, and Wellbeing) reserch group, which consists of researchers across the University of Bath, York St John University, and Leeds Becket University. The MPaW group is one of the worlds leading groups investigating perfectionism.
+
+Professor Andy Hill, lead of the the MPaW group, has already demonstrated interest in this project:
+
+> "Sounds like a really interesting project. An assessment of the meaning and social understanding of perfectionism (inferred by the other words/topics it coalesces with) and if this has changed over time, would contribute to research in this area. I look forward to seeing the results!"
+
+The results of this project will be used by the MPaW group for two key purposes:
+
+1. Assist in the tranlsation and disseminaton of results from academic research papers into the public domain, in a manner that is digestable and challenges any preconceived biases and perceptions. This is important too for the University institutions, as part of their resarch funding is achieved through the REF system, of which they are graded for *effective* dissemination of their research findings into the borader public domain.
+2. Assist in the development of psychometric instruments (of which are undeprinned by question wording and perception).
+
+***
+
+##### **What data are you going to use for this? How will you acquire this data?**
+
+To acquire data for this project, web scraping and data mining techniques will be employed across a range of blogs, news websites, and social media platforms. To assist in this process, several R packages will be employed including {tm.plugin.webmining} and {twitteR}.
+
+***
+
+##### **In brief, outline your approach to solving this problem (knowing that this might change later).**
+
+1. Extract data from the web using various R packages.
+2. Tokenize words using the tidytext package.
+3. Compare words against a sentiment lexicon.
+
+***
+
+##### **What are your deliverables? Typically, this would include code, along with a paper and/or a slide deck.**
+
+1. R code that extracts, wrangles, and analyses the data.
+2. A report, written in R Markdown, which summarises the problem, strategies, and findings.
+3. A non-technical slide deck.
