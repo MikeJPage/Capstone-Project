@@ -26,15 +26,13 @@ The results of this project will be used by the MPaW group for two key purposes:
 
 ##### **What data are you going to use for this? How will you acquire this data?**
 
-To acquire data for this project, web scraping and data mining techniques will be employed across a range of blogs, news websites, and social media platforms. To assist in this process, several R packages will be employed including {tm.plugin.webmining} and {twitteR}.
+Data will be scraped from news and blog sites using a variety of appraoches: (i) where possible, API clients will be used to scrape data, (ii) the {Rcrawler} package will be used to crawl sites using xPath and keyword queries (iii) the {rvest} package will be used to scrape data by iterating through a list of provided URL's, (iv) the {tm.plugin.webmining} package will be used to scrape data from various news platforms.
 
 ***
 
 ##### **In brief, outline your approach to solving this problem (knowing that this might change later).**
 
-1. Extract data from the web using various R packages.
-2. Tokenize words using the tidytext package.
-3. Compare words against a sentiment lexicon.
+First, a semantic analysis using a tidy text approach as outlined in Silge and Robinson (2017) will be performed. This involves wrangling the data into a 'tidy' format using tidy data principles, and then using the {tidytext} package in conjunction with several tidyverse packages to explore the data. Secondly, topic modelling will be performed, using the Latent Dirichlet Allocation algorithm in conjuction with the {topicmodels} package.
 
 ***
 
