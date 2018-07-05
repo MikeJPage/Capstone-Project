@@ -1,0 +1,64 @@
+---
+title: "Data Wrangling"
+author: "Michael Page"
+date: "03/07/2018"
+output: html_document
+---
+***
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Raw Data
+To obtain data, an API client for the [NewsRiver API](https://newsriver.io) was built using the {httr} package. Code for the API client (in addition to all data wrangling steps) can be found in the Data_Wrangling.R file [here](https://github.com/MikeJPage/Capstone_Project/blob/master/Data_Wrangling.R). The .json files returned by the API were parsed as text and then stored as tibbles (tibbles were chosen in order to maintain consistency with the 'tidy' framework of this study, discussed below).
+
+***
+
+#### Tibbles and Variable Selection
+The returned tibbles contained 19 different variables, many of which were of no interest in this study (e.g., read time, website icon url, etc.) and conatained large quantities of NA values. Using some code from the {dplyr} package, four key variables of interest were selected inline with the aims of the project (i.e., title, text, date, and website). The website and article publication date vraibles were also renamed, and the article publication date variable was transformed into date format for later analysis:
+
+```{r, eval = FALSE}
+news_tbl <- news_tbl %>% mutate(date = as.Date(discoverDate), website = website.domainName) %>% select(title, text, date, website)
+```
+```{r include = FALSE}
+perf_news <- readr::read_rds("perf_news.RDS")
+```
+The final tibble from the API now looked like:
+
+```{r, echo = FALSE}
+perf_news
+```
+
+***
+
+#### Cleaning Variables
+
+* The website variable contained `r sum(is.na(perf_news$website))` NA values. As the website variable is not needed for all analysis, these observations were kept in order to maintain sample size. The NA values will be removed in subsequent analyses requiring the website variable.
+
+* Unicode characters (e.g., "i\u2019m") found in the text and title were transformed into ASCII characters using the {stringi} package:
+
+```{r, eval = FALSE}
+perf_news %<>% mutate(text = stringi::stri_trans_general(perf_news$text, "latin-ascii"), title = stringi::stri_trans_general(perf_news$title, "latin-ascii"))
+```
+
+* To detect duplicate obersvations, first, strings from the title column were transformed to lower case. Duplicate observations were then removed:
+
+```{r, eval = FALSE}
+perf_news %<>% mutate(title = str_to_lower(title))
+perf_news %<>% distinct(title, .keep_all = TRUE)
+```
+
+***
+
+#### Tidy Text Format
+* The structure of the data in this project will vary depending upon the analysis performed. Nonetheless, a 'tidy' data structure will be used predominately throughout, and so is demonstrated here. A tidy data structure is one where each variable is a column, each observation is a row, and each type of observational unit is a table [(Wickham, 2014)](https://www.jstatsoft.org/article/view/v059i10). Accordingly, the cleaned tibbles above were transformed into a 'tidy text' format, with one word per row as specificed in [Silge & Robinson (2017)](https://www.tidytextmining.com):
+
+```{r, eval = FALSE}
+tidy_news <- perf_news %>% unnest_tokens(word, text)
+```
+
+* Finally, stop words (e.g., "the", "to", "of", etc.) were removed as these were not deemed useful for the proposed analyses:
+
+```{r, eval = FALSE}
+tidy_news <- tidy_news %>% anti_join(stop_words)
+```
