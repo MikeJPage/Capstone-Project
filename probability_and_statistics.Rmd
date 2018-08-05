@@ -1,0 +1,406 @@
+---
+title: "Probability and Statistics"
+author: "Michael Page"
+date: "05/08/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center")
+```
+
+***
+
+```{r preparatory code, include = FALSE}
+
+# Load libraries
+
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(xml2)
+library(urltools)
+library(lubridate)
+library(magrittr)
+library(tidytext)
+library(tidyr)
+library(wordcloud)
+library(reshape2)
+library(igraph)
+library(ggraph)
+library(widyr)
+library(topicmodels)
+library(ldatuning)
+
+# Load data sets
+
+perf_news <- read_rds("perf_news.RDS")
+tidy_news <- read_rds("tidy_news.RDS")
+
+```
+
+##### Frequency distributions
+
+In order to understand the underlying structure of the data, several exploratory data analyses were performed.  
+
+*Term frequency distribution*: the frequency of terms in each article were calculated and then divided by the total number of terms in each article (i.e., term frequency) as can be seen in Figure 1:
+
+```{r term frequency distribution, fig.cap='Figure 1. Term frequency across all articles.'}
+
+words_news <- perf_news %>% 
+  unnest_tokens(word, text) %>% 
+  count(title, word, sort = TRUE) %>% 
+  ungroup()
+
+words_total <- words_news %>% 
+  group_by(title) %>% 
+  summarise(total = sum(n))
+
+words_news <- left_join(words_news, words_total)
+
+ggplot(words_news, aes(n/total, fill = title)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.025) +
+  theme(strip.text = element_text(size = 7))
+
+```
+
+The distribution in Figure 1 demonstrates a large positive skew, as would be expected in a corpus of natural language such as the one in this study. This is because some types of words such as articles (e.g., 'the') appear more frequently than other types of words. 
+
+*Zipf's law*: to further explore the term frequency distribution in Figure 1, frequency rank against term frequency (on logarithmic scales) was plotted. A linear model was fitted to the plot to further examine the underlying data structure (Figure 2):
+
+```{r linear model, include = FALSE}
+
+freq_by_rank <- words_news %>% 
+  group_by(title) %>% 
+  mutate(rank = row_number(), `term frequency` = n/total)
+
+lm(log10(`term frequency`) ~ log10(rank), data = freq_by_rank)
+
+```
+
+```{r Zipfs law, fig.cap='Figure 2. Zipfs law applied to the data.'}
+
+ freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = title)) +
+  geom_abline(intercept = -1.1029,slope = -0.7564, color = "black", linetype = 2) +
+  geom_line(size = 0.5, alpha = 0.5, show.legend = FALSE) +
+  scale_x_log10() +
+  scale_y_log10()
+
+```
+
+The relationship between term frequency and rank in Figure 2 represents that of Zipf's law (an interpretation of the power law). That is, that there is an inverse relationship between term frequency and rank (i.e., the most frequent word will occur approximately twice as often as the second most frequent word, etc.). The middle section of the rank range in Figure 2 has a gradient of -0.76, as determined by the fitted linear model, demonstrating that the data in this study does not strictly abide to Zipf's law (i.e., a perfect case of Zipf's law would result in a gradient of -1). Furthermore, there are small deviations at both the higher and lower ranked words. This means that the data set contains fewer rare and common words than would typically be predicted by a power law. Nonetheless, these kind of deviations are not uncommon for many kinds of natural language (Silge & Robinson (2017). Collectively, the plots in Figure 1 and Figure 2 confirm that data in this project represent a typical corpus of natural language, justifying further analyses.
+
+##### Word frequencies
+
+To understand the basic text composition of the corpus of news articles, a list of custom stop words was removed from the data (see appendix) and the most common words were found (Figure 3):
+
+```{r word frequencies bar, fig.cap='Figure 3. The most common words across all articles.'}
+ 
+# Create custom stop words
+
+custom_stop_words <-  bind_rows(tibble(word = c("perfect", 
+                                                "perfection", 
+                                                "perfectionism", 
+                                                "perfectly", 
+                                                "perfectionist", 
+                                                "perfectionists", 
+                                                "curran", 
+                                                "thomas", 
+                                                "andy", 
+                                                "hill"), 
+                                       lexicon = c("custom")), stop_words)
+
+# Find and plot the most common words in tidy_news after applying custom stop words
+
+# As a bar chart:
+
+tidy_news %>%
+  anti_join(custom_stop_words) %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 50) %>% 
+  mutate(word = reorder(word, n)) %>% 
+  ggplot(aes(word, n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  labs(y = "Word Frequency (n)")
+
+```
+
+The most common words match those one would expect to find in a corpus of language discussing perfectionism. For example, words such as 'expectations', 'standards', and 'pressure' appear, words commonly used in the academic domain that reflect the high expectations perfectionists place upon themselves. Other words such as 'students', 'college', and 'university' also appear, again, unsurprising given that large body of academic research has been conducted in University samples. This basic frequency analysis indicates that the words used in this corpus of text can be paralleled to that in the academic domain. Figure 4 demonstrates a further exploration into the most common words used (with the size of the word equating to frequency):
+
+```{r word frequencies bar cloud, fig.cap='Figure 4. A word cloud of the most frequent perfectionism terms used across all articles.'}
+
+# As a word cloud:
+
+tidy_news %>%
+  anti_join(custom_stop_words) %>% 
+  count(word) %>% 
+  with(wordcloud(word, n, max.words = 100, colors= c("steelblue1","steelblue2","steelblue3","steelblue")))
+
+```
+
+##### Sentiment Analyses
+
+*Sentiment time analysis*: Having established that the data represented a typical corpus of natural language, and contained words inline with those one may expect in a corpus of text examining perfectionism, a sentiment analysis over time was performed. This was done in order to explore the underlying polarity of the data (i.e., is perfectionism reported in a positive or negative fashion), and to see if this has changed over time. To achieve this, articles were first tokenised by sentence and assigned a sentence number. Next, the sentences were tokenised by word. To compute a sentiment score for each article, individual word sentiment scores across each sentence were summed, and then each sentence sentiment score across each article was summed. Analyzing sentiment in sentence units, as was done here, better captures the structure of natural language over simpler unigram methods such as summing individual word sentiment scores across a whole text (Silge & Robinson, 2017). In order to provide a multifaceted sentiment analysis, three sentiment lexicons (AFINN, Bing, and NRC) were used to determine the sentiment of each article. For each lexicon, sentiment was split into negative and positive classifications, inline with the theory on perfectionistic strivings and perfectionistic concerns, as can be seen in Figure 5:
+
+
+```{r tidier news, include = FALSE}
+
+# Create a new data set called tidier_news which is tokenized by word, but keeps track of sentence number
+
+tidier_news <- perf_news %>% 
+  unnest_tokens(sentence, text, token = "sentences") %>% 
+  group_by(title) %>% 
+  mutate(sentence_number = row_number()) %>% 
+  ungroup() %>%
+  unnest_tokens(word, sentence) %>% 
+  anti_join(custom_stop_words)
+
+```
+
+
+```{r sentiment analyses, fig.cap='Figure 5. Sentiment analysis over time.'}
+
+# Perform sentiment analyses using three different sentiment lexicons (AFINN, Bing, and NRC). Compute sentiment in sentence units by summing individual word sentiment scores across each sentence.
+
+# AFINN
+
+afinn <- tidier_news %>% 
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(title, sentence_number) %>% 
+  mutate(sentiment = sum(score)) %>%
+  select(date, title, sentence_number, sentiment) %>% 
+  distinct() %>% 
+  group_by(title) %>% 
+  mutate(sent_sum = sum(sentiment)) %>% 
+  ungroup() %>% 
+  select(date, title, sent_sum) %>% 
+  distinct()
+
+# Bing
+
+bing <- tidier_news %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(date, title, sentence_number, sentiment) %>% 
+  spread(sentiment, n, fill = 0) %>% 
+  mutate(sentiment = positive - negative) %>% 
+  group_by(title) %>% 
+  mutate(sent_sum = sum(sentiment)) %>% 
+  ungroup() %>% 
+  select(date, title, sent_sum) %>% 
+  distinct()
+
+# NRC
+
+nrc <- tidier_news %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  filter(sentiment %in% c("positive", "negative")) %>%
+  count(date, title, sentence_number, sentiment) %>% 
+  spread(sentiment, n, fill = 0) %>% 
+  mutate(sentiment = positive - negative) %>% 
+  group_by(title) %>% 
+  mutate(sent_sum = sum(sentiment)) %>% 
+  ungroup() %>% 
+  select(date, title, sent_sum) %>% 
+  distinct()
+
+# Plot all three sentiment analyses on one graph
+
+bind_rows(afinn %>% mutate(method = "AFINN"), bing %>% mutate(method = "Bing et al."), nrc %>% mutate(method = "NRC")) %>% 
+  ggplot(aes(date, sent_sum, fill = method)) +
+  geom_col(position = position_dodge(0.5), show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y") +
+  labs(x = "Date", y = "Sentiment Score")
+
+```
+
+The data in Figure 5 reveals several noteworthy artifacts about the data. Firstly, the frequency of publications over time remains consistent, with no time period demonstrating a noticeable increase in publication frequency. Secondly, there appears to be no significant trends in sentiment over time (i.e., the distribution of sentiment scores remains consistent over the time). Finally, the plots reveal that articles report perfectionism in both a positive and negative manner. Using the AFINN and Bing sentiments, perfectionism is frequently reported in a negative fashion, whereas the NRC lexicon demonstrates the opposite effect. One reason for the observed difference in sentiment scores between lexicons may be the higher ratio of positive to negative words used in the NRC lexicon in comparison to the AFINN and Bing lexicons. The table below demonstrates this difference between the Bing and NRC lexicons:
+
+
+```{r lexicon comparison}
+
+nrc_lex <- get_sentiments("nrc") %>% 
+     filter(sentiment %in% c("positive", 
+                             "negative")) %>% 
+  count(sentiment) %>% 
+  mutate(lexicon = "nrc")
+
+bing_lex <- get_sentiments("bing") %>% 
+  count(sentiment) %>% 
+  mutate(lexicon = "bing")
+
+knitr::kable(bind_rows(nrc_lex, bing_lex))
+```
+
+*Frequent positive and negative words*: the most frequent positive and negative words across all texts were found using the Bing sentiment lexicon as shown in Figure 6: 
+
+```{r positive negative bar, fig.cap='Figure 6. The most frequent positive and negative terms contributing to sentiment.'}
+
+# Find the most common positive and negative words
+
+bing_word_counts <- tidier_news %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(word, sentiment, sort = TRUE) %>% 
+  ungroup()
+
+# Plot the most common positive and negative words
+
+# As a bar chart:
+
+bing_word_counts %>% 
+  group_by(sentiment) %>% 
+  top_n(10) %>% 
+  ungroup() %>% 
+  mutate(word = reorder(word, n)) %>% 
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "contribution to sentiment", x = NULL) +
+  coord_flip()
+
+```
+
+Similar to the term frequency analysis conducted earlier, many predictable terms appear. For example, of the most frequent negative terms, 'failure', 'mistakes', and 'unrealistic' are commonly used in the academic literature to denote the unrealistic expectations perfectionists demand upon themselves, and their associated fear of failure and mistakes. This also extends to terms such as 'hard', 'unhealthy', and 'depression', terms in the academic literature which denote the experiences perfectionists typically find themselves in. On the contrary, of the most frequent positive terms, many terms appear unexpected. Indeed some terms such as 'positive' and 'healthy' do parallel those terms used in the academic literature (denoting perfectionistic strivings), however, terms such as 'love', 'worth', and 'happy' are not common occurrences in academic texts. Moreover, one would expect literature discussing perfectionism to discuss low self-worth, and a deficit of happiness and love reflecting the relationship and life difficulties associated with perfectionism (Dunkley et al., 2003;  Hewitt and Flett, 2002). Perhaps one explanation for the occurrence of unexpected words is the use of unigrams to determine sentiment. Indeed, statements such as 'not happy' reflect a negative sentiment, yet result in a positive sentiment as the outcome (i.e, not gets discarded as a stop word and happy gets treated as a positive sentiment). One way to overcome and further explore this is through the use of bigrams.
+
+##### Bigrams
+
+```{r bigram prep, include = FALSE}
+
+# Unnest tokens by bigrams keeping track of sentence number
+
+bigram_news <- perf_news %>%
+  unnest_tokens(sentence, text, token = "sentences") %>% 
+  group_by(title) %>% 
+  mutate(sentence_number = row_number()) %>% 
+  ungroup() %>% 
+  unnest_tokens(bigram, sentence, token = "ngrams", n = 2)
+
+# Separate bigrams into two columns, "word1", and "word2".
+
+bigrams_separated <- bigram_news %>% 
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+```
+
+*Bigram sentiment time analysis*: in order to account for any negation words in the data set and their effect on sentiment scores, a further sentiment analysis using bigrams was performed. First, the perf_news data set was tokenised by bigrams while keeping track of sentence number. Then, a sentiment analysis was performed by reversing the sentiment score of any bigrams that matched a list of negation words ('not', 'never', 'no', 'without'). As was done in the unigram sentiment analysis conducted previously, individual word sentiment scores across each sentence were summed, and then each sentence sentiment score across each article was summed to achieve a sentiment score for each article, as can be seen in Figure 7:
+
+```{r bigram sentiment, fig.cap='Figure 7. Sentiment analysis over time using bigrams.'}
+
+# Use bigrams to perform sentiment analyses by reversing the sentiment score of negated words
+
+AFINN <- get_sentiments("afinn")
+
+negation_words <- c("not", "never", "no", "without")
+
+bigrams_afinn <- bigrams_separated %>% 
+  filter(!word1 %in% custom_stop_words$word) %>% 
+  filter(!word2 %in% custom_stop_words$word) %>% 
+  inner_join(AFINN, by = c(word2 = "word")) %>%
+  mutate(score = ifelse(word1 %in% negation_words, -score, score))
+
+bigrams_afinn_sentiment <- bigrams_afinn %>%
+  group_by(title, sentence_number) %>% 
+  mutate(sentiment = sum(score)) %>%
+  select(date, title, sentence_number, sentiment) %>% 
+  distinct() %>% 
+  group_by(title) %>% 
+  mutate(sent_sum = sum(sentiment)) %>% 
+  ungroup() %>% 
+  select(date, title, sent_sum) %>% 
+  distinct()
+
+ggplot(bigrams_afinn_sentiment, aes(date, sent_sum, fill = date)) +
+  geom_col(position = position_dodge(0.7), width = 2, show.legend = FALSE) +
+  labs(y = "sentiment score", x = "date")
+
+```
+
+The data in Figure 7 demonstrate that after controlling for negation words, the articles still maintained a split across both positive and negative sentiments. However, in this instance, there was a heavier weighting towards a negative sentiment.
+
+*Bigram frequency*: having tokenised the data set by bigrams, a frequency count of the most common bigrams was computed to further explore the underlying structure of the data, as can be seen in the table below:
+
+```{r bigram frequency}
+
+# Count most frequent bigrams not keeping track of sentence
+
+bigram_counts <- perf_news %>% 
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>% 
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>% 
+  filter(!word2 %in% stop_words$word) %>% 
+  count(word1, word2, sort = TRUE)
+
+knitr::kable(bigram_counts[1:10, ])
+
+
+```
+
+The data in the above table demonstrates that the public reporting of perfectionism is inline with the latest research in the academic domain. For instance, the most frequent bigram terms closely match those of a recent publication by Curran and Hill (2017) published in Psychological Bulletin in which 'social media', 'socially prescribed (perfectionism)' and 'mental health' are discussed in the context of college students
+
+*Bigram igraph*: to visualise the relationship among bigrams simultaneously, the data was arranged into a network of connected nodes, as can be seen in Figure 8:
+
+```{r bigram igraph, fig.cap='Figure 8. The most frequent bigrams visualised as a network of connected nodes.'}
+
+# Create igraph object for the most frequent bigrams. The transparency of links denotes how common or rare the bigram is
+
+bigram_graph <- bigram_counts %>% 
+  filter(n > 6) %>% 
+  graph_from_data_frame()
+
+set.seed(1234)
+a <- grid::arrow(type = "closed", length = unit(.05, "inches"))
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE, arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 3) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+
+```
+
+##### Pairwise correlations
+
+*Pairwise correlations*: to determine which words various perfectionism terms (e.g., perfect, perfectionist, etc.) coalesce with, pairwise correlations were calculated using the phi coefficient. This identified how much more likely it was that a word would appear in conjunction with a perfectionism term, or that neither term appeared, than that one appeared without the other (Figure 9):
+
+```{r pairwise prep, include = FALSE}
+
+# Calculate pairwise correlations of words using the phi coefficient. This identifies how much more likely it is that either both word X and Y appear, or neither do, than that one appears without the other.
+
+word_cors <- perf_news %>% 
+  unnest_tokens(sentence, text, token = "sentences") %>% 
+  group_by(title) %>% 
+  mutate(sentence_number = row_number()) %>% 
+  ungroup() %>%
+  unnest_tokens(word, sentence) %>% 
+  filter(!word %in% stop_words$word) %>% 
+  group_by(word) %>% 
+  filter(n() >= 20) %>% 
+  pairwise_cor(word, title, sort = TRUE)
+
+```
+
+```{r pairwise cor, fig.cap='Figure 9. Pairwise correlations with various perfectionism terms.'}
+
+# Plot words most correlated with different perfectionism terms
+
+word_cors %>%
+  filter(item1 %in% c("perfect", "perfection", "perfectionism", "perfectly", "perfectionist", "perfectionists")) %>% 
+  group_by(item1) %>%
+  top_n(6) %>%
+  ungroup() %>% 
+  group_by(item1, item2) %>%                  
+  arrange(desc(correlation)) %>%                
+  ungroup() %>%
+  mutate(item2 = factor(paste(item2, item1, sep = "__"), levels = rev(paste(item2, item1, sep = "__")))) %>%
+  ggplot(aes(item2, correlation, fill = item1)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ item1, scales = "free") +
+  coord_flip() +
+  scale_x_discrete(labels = function(x) gsub("__.+$", "", x)) +
+  xlab(NULL)
+
+```
+
+With the exception of the terms  'perfect' and 'perfectionists', the words correlated with the other perfectionism terms mirrors that of those found in the frequency analysis conducted previously. These words include mistakes, fear, failure, and 'expectations', all words in the arsenal of the academic perfectionism lexicon. The terms correlated with 'perfect' and 'perfectionists' on the other hand are not in keeping with this theme. For instance, the occurrence of the terms 'pregnancy', 'person', 'kids', and 'week' do not have any discernible significance in the academic perfectionism literature. A quick exploration of the perf_news data set reveals that three articles discuss perfectionism and pregnancy, with one article ('perfectionism and the pregnant woman') containing both terms in the title, explaining the correlation these terms.
